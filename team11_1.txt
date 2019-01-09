@@ -1,0 +1,58 @@
+# Required Lib
+library(dplyr)
+library(stringr)
+library(data.table)
+library(ggplot2)
+library(maptools)
+library(knitr)
+library(mapproj)
+library(RColorBrewer)
+library(jsonlite)
+
+t1<-read.csv("FIFA2017.csv",nrows=1000,encoding="UTF-8",stringsAsFactors=FALSE)
+t2<-read.csv("FIFA2018.csv",nrows=3000,encoding="UTF-8")
+t2<-subset(t2, club !="Icons")
+t1<-t1[1:1000,]
+t2<-t2[1:1000,]
+#testing<-t1[,c("jobcat","employ","income")]
+#tmp<-data.frame(Name="",Club="",Rating=0,stringsAsFactors=FALSE)
+
+testing<-t1[,c("Name","Club","Rating","Short_Pass","Long_Pass","Acceleration","Speed","Stamina",
+"Finishing","Shot_Power","Long_Shots","Balance","Agility",
+"Jumping","Reactions","Dribbling","Aggression","Strength")]
+
+result<-t2[,c("player_name","club","overall","pass_short","pass_long","pace_acceleration","pace_sprint_speed","phys_stamina",
+"shoot_finishing","shoot_shot_power","shoot_long_shots","drib_balance","drib_agility",
+"phys_jumping","drib_reactions","dribbling","phys_aggression","phys_strength")]
+
+#result<-cbind(tmp,result)
+colnames(result)<-colnames(testing)
+
+train_model<-lm(formula = Rating ~Short_Pass+Long_Pass+Acceleration+Speed+Stamina+
+Finishing+Shot_Power+Long_Shots+Balance+Agility+
+Jumping+Reactions+Dribbling+Aggression+Strength,data = testing)
+
+result$Aggression<-as.numeric(result$Aggression)
+result$Dribbling<-as.numeric(result$Dribbling)
+result$Rating<-predict(train_model,result)
+
+#team<-data.frame(Club="",Rating_sum=0,stringsAsFactors=FALSE)
+
+team<- result %>%
+  group_by(Club) %>%
+  summarise(aver_rating=mean(Rating))
+team<-data.frame(club=team$Club,aver_rating=team$aver_rating)
+tcount<- result %>%
+  group_by(Club) %>%
+  summarise(n=n())
+tcount<-data.frame(club=tcount$Club,n=tcount$n)
+a<-merge(team,tcount,by="club")
+a<-arrange(a,desc(aver_rating))
+a<-subset(a,n>=11)
+final_result<-a[,1:2]
+
+#Graph
+graph<-final_result[1:10,]
+graph$aver_rating<-graph$aver_rating-80
+ggplot(data=graph,aes(x=club,y=aver_rating,fill=aver_rating))+
+geom_bar(stat="identity")+scale_y_continuous(breaks=seq(80,85,1))
